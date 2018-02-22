@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>       
+    
+      .thrustGaugePanel {
+        background-image: -webkit-gradient(
+        linear, right bottom, left bottom, from(rgba(255, 255, 255, 0.2)),
+          to(rgba(255, 255, 255, 0))
+        );
+        position: absolute;
+        display: inline-block;
+        left: 22%;
+        text-align: justify;
+        bottom: 0;
+        text-align: center;
+        color: #fff;
+        *float: left;
+        width: 50%;
+        height: 120px;
+        *margin: 0 20px 20px 0;
+        *-webkit-border-radius: 10px;
+        *-moz-border-radius: 10px;
+        border-radius: 10px;
+        *clear: both;
+      }
+
+      .canvas-wrap-gauge{
+        position: relative;
+        display: inline-block;
+        left: 0;
+        width: 150px;
+        height:150px;
+      }
+
+      .canvasThrustGauge{
+        width: 100%;
+        height: 100%;
+        top: 0;
+        z-index: 0;
+        position: relative;
+      }
+
+       .gaugeThrustText{
+        position: absolute;
+        top: 45%;
+        left: 0%;
+        width: 100%;
+        z-index: 1;
+        text-align: center;
+        font-size: 1em;
+        font-weight: bold;
+        color: white;
+        font-family: 'Amaranth', sans-serif;
+      }
+    </style>
+    
+    <script Xsrc="jquery-3.3.1.min.js" src="./jquery-3.3.1.min.js"></script>
+    <script src="../bower_components/webcomponentsjs/webcomponents-lite.js"></script>
+    <script src="../bower_components/web-component-tester/browser.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="./lib/angular.min.js"></script>
+	  <script src="./lib/d3.min.js"></script>
+    <script src="./lib/gauge.min.js"></script>
+    <script src="./lib/math.min.js"></script>
+    <script src="./lib/gamepad.min.js" ></script>
+    
+    <!--import the element to test -->
+    <link rel="import" href="../krapong-horizon.html">
+    <link rel="import" href="../packet-video.html">
+
+    <title>Krapong Cockpit</title>
+
+  </head>
+  <body style="background-color:#595959;">
+    
+    
+      <div id="video_container" class="full-height center pagination-centered" boder="1" style="position:relative; z-index:0; width:100%; height:100%;">
+  
+      <!--<packet video component declaration-->
+      <packet-video id='camera' border='1' style='width: 100%; height:100%;'></packet-video>
+       
+       <div class="thrustGaugePanel">
+        <div class="canvas-wrap-gauge">
+          <canvas class="canvasThrustGauge" id="canvasGauge_0" width=150 height=150 > Canvas not supported </canvas>
+          <div class="gaugeThrustText" id="canvasGaugeText_0"></div>
+        </div>
+  
+        <div class="canvas-wrap-gauge">
+          <canvas class="canvasThrustGauge" id="canvasGauge_1" width=150 height=150 > Canvas not supported </canvas>
+          <div class="gaugeThrustText" id="canvasGaugeText_1"></div>
+        </div>
+  
+        <div class="canvas-wrap-gauge">
+          <canvas class="canvasThrustGauge" id="canvasGauge_2" width=150 height=150 > Canvas not supported </canvas>
+          <div class="gaugeThrustText" id="canvasGaugeText_2"></div>
+        </div>
+  
+        <div class="canvas-wrap-gauge">
+          <canvas class="canvasThrustGauge" id="canvasGauge_3" width=150 height=150 > Canvas not supported </canvas>
+          <div class="gaugeThrustText" id="canvasGaugeText_3"></div>
+        </div>
+  
+        <div class="canvas-wrap-gauge">
+          <canvas class="canvasThrustGauge" id="canvasGauge_4" width=150 height=150 > Canvas not supported </canvas>
+          <div class="gaugeThrustText" id="canvasGaugeText_4"></div>
+        </div>
+      </div>
+      
+       <!--Horizon HUD compoment-->
+       <krapong-horizon  id="horizon" style='position:absolute; top:0px; right:0px; z-index:1; width:100%; height:100%;'></krapong-horizon>
+     
+     </div>
+     
+    
+    <script>
+    
+    var opts = {
+      angle: 0.18, // The span of the gauge arc
+      lineWidth: 0.05, // The line thickness
+      radiusScale: 0.5, // Relative radius
+      pointer: {
+        length: 0.6, // // Relative to gauge radius
+        strokeWidth: 0.035, // The thickness
+        color: '#000000' // Fill color
+      },
+      limitMax: false,     // If false, max value increases automatically if value > maxValue
+      limitMin: false,     // If true, the min value of the gauge will be fixed
+      colorStart: '#FAA755',   // Colors
+      colorStop: '#DBD6D4',    // just experiment with them
+      strokeColor: '#EEEEEE',  // to see which ones work best for you
+      generateGradient: true,
+      highDpiSupport: true,     // High resolution support
+    };
+
+    //console.log('canvasGauge_' + Integer.toString(i));
+
+    var target = [];
+    var thrusterGauge = [];
+    for(var i=0; i < 5; i++){
+      //target[i] = document.getElementById('canvasGauge_' + i); // your canvas element
+      thrusterGauge[i] = new Donut(document.getElementById('canvasGauge_' + i)).setOptions(opts); // create sexy gauge!
+      thrusterGauge[i].setTextField(document.getElementById("canvasGaugeText_" + i));
+      thrusterGauge[i].maxValue = 100; // set max gauge value
+      thrusterGauge[i].setMinValue(0);  // Prefer setter over gauge.minValue = 0
+      thrusterGauge[i].animationSpeed = 54; // set animation speed (32 is default value)
+      thrusterGauge[i].set(50); // set actual value
+    }
+    
+    var socket  = io.connect()
+        ,vid     = document.getElementById("camera")
+        ,horizon = document.getElementById("horizon");  
+
+    
+    setTimeout(load, 3000);
+    setTimeout(gamepad, 1000);
+
+      function gamepad(){
+        var gamepad = new Gamepad();
+        var device_index
+          , device_connected = false
+          , tick = 0;
+  
+        var gamepadJSON = {
+          surge: 0,
+          sway: 0,
+          yaw: 0,
+          heave: 0,
+          light: 0,
+          boost: 0
+        }
+  
+        if (!gamepad.init()) {
+          alert('Your browser does not support gamepads, get the latest Google Chrome or Firefox.');
+         }
+  
+         gamepad.bind(Gamepad.Event.CONNECTED, function(device) {
+           //if((device.id == 'Unknown Gamepad (STANDARD GAMEPAD Vendor: 054c Product: 05c4)') && (device_connected == false))
+           if((device.id.indexOf("Vendor: 054c Product: 05c4") >= 0) && (device_connected == false))
+      			{
+      			    device_index = device.index;
+      			     device_connected = true;
+      			    console.log('Connected', device);
+      			}
+           console.log('Connected', device);
+           //window.gamepad = device[0];
+         });
+  
+         // gamepad.bind(Gamepad.Event.DISCONNECTED, function(device) {
+  		   //     console.log('Controller has disconnected');
+  	     // });
+         //
+         gamepad.bind(Gamepad.Event.BUTTON_DOWN, function(e) {
+           //console.log('button: ' + e.control + ', value: '+ e.value);
+           if(e.control === 'RIGHT_TOP_SHOULDER') gamepadJSON.boost = parseFloat(1);
+           if(e.control === 'DPAD_UP') gamepadJSON.boost = parseFloat(1);
+           if(e.control === 'DPAD_DOWN') gamepadJSON.boost = parseFloat(1);
+           //thrustAlloc(gamepadJSON);
+        	});
+         //
+        	gamepad.bind(Gamepad.Event.BUTTON_UP, function(e) {
+        		// e.control of gamepad e.gamepad released
+            if(e.control === 'RIGHT_TOP_SHOULDER') gamepadJSON.boost = parseFloat(0);
+            if(e.control === 'DPAD_UP') gamepadJSON.boost = parseFloat(0);
+            if(e.control === 'DPAD_DOWN') gamepadJSON.boost = parseFloat(0);
+            //thrustAlloc(gamepadJSON);
+        	});
+         //
+        	gamepad.bind(Gamepad.Event.AXIS_CHANGED, function(e) {
+            // var axis = e[device_index].axis;
+        		//console.log('axis: ' + e.axis + ', value: '+ e.value);
+             if(e.axis === 'LEFT_STICK_Y') gamepadJSON.surge = parseFloat(e.value);
+             if(e.axis === 'LEFT_STICK_X') gamepadJSON.sway = parseFloat(e.value);
+             if(e.axis === 'RIGHT_STICK_Y') gamepadJSON.heave = parseFloat(e.value);
+             if(e.axis === 'LEFT_BOTTOM_SHOULDER') gamepadJSON.yaw= parseFloat(e.value * -1);
+             if(e.axis === 'RIGHT_BOTTOM_SHOULDER') gamepadJSON.yaw = parseFloat(e.value);
+             //thrustAlloc(gamepadJSON);
+             //if(e.axis === 'RIGHT_STICK_X') gamepadJSON.surge = parseFloat(e.value);
+        	});
+  
+         gamepad.bind(Gamepad.Event.TICK, function(gamepads) {
+           var gamepad = gamepads[device_index];
+           if(tick > 10) {
+             tick = 0;
+                gamepadJSON.surge = parseFloat(gamepad.axes[1]),
+        				gamepadJSON.sway = parseFloat(gamepad.axes[0]),
+        				gamepadJSON.yaw = parseFloat(gamepad.buttons[6].value * -1) + parseFloat(gamepad.buttons[7].value),
+        				gamepadJSON.heave = parseFloat(gamepad.axes[3]),
+        				gamepadJSON.light = parseInt(gamepad.buttons[12].value) + parseInt(gamepad.buttons[13].value * -1),
+        				gamepadJSON.boost = parseFloat(gamepad.buttons[5].value)
+        				thrustAlloc(gamepadJSON);
+           }tick++;
+        });
+      }
+      
+        function thrustAlloc(dirThrust){
+        var data = dirThrust;
+        if(data){
+          //console.log(data);
+          var x = math.matrix([[data.surge], [data.sway], [data.yaw / 2], [data.heave]]);
+  
+          var f = math.multiply(math.matrix([[-0.3535533906,  0.3535533906,  0.8928571429, 0],
+                                             [-0.3535533906, -0.3535533906, -0.8928571429, 0],
+                                             [ 0.3535533906, -0.3535533906,  0.8928571429, 0],
+                                             [ 0.3535533906,  0.3535533906, -0.8928571429, 0],
+                                             [            0,             0,             0, 1]]), x);
+  
+          // Planar motion thust adjustmentation
+          for (var i = 0 ; i < 4; i++) {
+                  // Thruster boost with R1
+                  if(data.boost) f._data[i] = Math.round(f._data[i] * 130)
+                  else {
+                    f._data[i] = Math.round(f._data[i] * 80);
+                  }
+                  if(f._data[i] < 5) f._data[i] = 0;
+          }
+  
+          // Vertical motion thrust adjustmentation
+          if(data.boost) f._data[4] = math.round(f._data[4] * 100);
+          else{
+            f._data[4] = Math.round(f._data[4] * 50);
+          }
+          
+          thrusterGauge[0].set(f._data[0]); // set actual value
+        thrusterGauge[1].set(f._data[1]); // set actual value
+        thrusterGauge[2].set(math.abs(f._data[4])); // set actual value
+        thrusterGauge[3].set(f._data[2]); // set actual value
+        thrusterGauge[4].set(f._data[3]); // set actual value
+  
+          
+          
+          var thrustJSON = {
+            thruster_1 : f._data[0],
+            thruster_2 : f._data[1],
+            thruster_3 : f._data[2],
+            thruster_4 : f._data[3],
+            thruster_5 : f._data[4],
+            light: data.light,
+            servo: 0,
+            test: 0
+          }
+          socket.emit('thrust.data', thrustJSON);
+        }
+      }
+
+
+        function load(){
+        
+          // //tell the server that client was ready.
+          socket.emit('message', 'start');
+
+          socket.on('video.init.segment', function(data){
+              var initialFrame = new Uint8Array(data);
+              vid.init(initialFrame);
+              socket.emit('video.init.segment', 'completed');
+          });
+
+          //mp4 fragment stream
+          socket.on('video.segment', function(data){
+            var data = new Uint8Array(data);
+            vid.append(data);
+            console.log(data);
+          });
+          
+          socket.emit('message', 'imu.on');
+          
+          horizon.registerEmitterHandlers(socket);
+        }
+    </script>
+  </body>
+
+  
+</html>
