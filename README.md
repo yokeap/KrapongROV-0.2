@@ -38,6 +38,6 @@ KrapongROV version 0.2, Remotely Operated Vehicle, KU IMS
   
  ### Software description:
  ------------
-  > Debian 9.3 (Stretch) with kernel 4.9.82-bone10 (custom modified)
-  > Node 8.9.4
-  > FFMPEG (piping the H.264 stream)
+  > Debian 9.3 (Stretch) with kernel 4.9.82-bone10 (custom modified) \
+  > Node 8.9.4 \
+  > FFMPEG (piping the H.264 stream) \
