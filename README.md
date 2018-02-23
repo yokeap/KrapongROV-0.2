@@ -23,7 +23,7 @@ KrapongROV version 0.2, Remotely Operated Vehicle, KU IMS
 * Low level Controller: 
   > Arduino Due 
   
-* Back tube (Power Section) monitoring; temperature, all system power consumtion.
+* Back tube (Power Section) monitoring; temperature and all system power consumtion.
   > Arduino Micro 
 
 
