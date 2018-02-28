@@ -31,6 +31,7 @@ var mpu = new mpu9150({
 
 var kalmanX = new mpu.Kalman_filter();
 var kalmanY = new mpu.Kalman_filter();
+var lowpassYaw = 0;
 var initialize = false;
 
 var imuSensor = function(){
@@ -54,6 +55,10 @@ var imuSensor = function(){
       ,	gyroZangle = 0
       , compAngleX = 0
       , compAngleY = 0;
+      
+imuSensor.prototype.getTemperature = function(){
+  return mpu.getTemperatureCelsiusDigital();
+};
 
 imuSensor.prototype.registerEmitterHandlers = function(emitter){
   this.emitter = emitter;
@@ -70,15 +75,23 @@ imuSensor.prototype.registerEmitterHandlers = function(emitter){
         timer = micros();
         
         pitch = mpu.getPitch(m9) + 90;
-        roll = (mpu.getRoll(m9) + 85) * -1;
-        yaw = (Math.round(mpu.getYaw(m9)) + 85.0);
-        if(yaw > -180.0){
-          yaw = yaw - 360.0;
-          //console.log(yaw)
+        roll = (mpu.getRoll(m9) + 91) * -1;
+        //yaw = (Math.round(mpu.getYaw(m9)) + 85.0);
+        yaw = Math.round(mpu.getYaw(m9));
+        if(yaw >= 0 && yaw <= 180){
+          yaw = yaw;
         }
-        else if (yaw < 180){
-          yaw = yaw + 360;
+        else{
+          yaw = 180 + (180 + yaw);
         }
+        
+        // if(yaw > -180.0){
+        //   yaw = yaw - 360.0;
+        //   //console.log(yaw)
+        // }
+        // else if (yaw < 180){
+        //   yaw = yaw + 360;
+        // }
         
         var gyroXrate = m9[3] / 131.0;
         var gyroYrate = m9[4] / 131.0;
@@ -109,8 +122,9 @@ imuSensor.prototype.registerEmitterHandlers = function(emitter){
         var imuData = {
         	pitch: compAngleY,
         	roll: compAngleX,
-        	clockwise: yaw
+        	clockwise: parseFloat(yaw).toFixed(0) - 87
         };
+        //console.log(imuData.clockwise);
         emitter.emit('imu.data', JSON.stringify(imuData));
     }, 50);
 };
