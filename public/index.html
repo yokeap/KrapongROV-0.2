@@ -83,7 +83,7 @@
         text-align: center;
         font-size: 1em;
         font-weight: bold;
-        color: white;
+        color: #ff9933;
         font-family: 'Amaranth', sans-serif;
       }
 
@@ -156,12 +156,12 @@
         data-borders="true"
         data-border-inner-width="0"
         data-border-middle-width="0"
-        data-border-outer-width="10"
-        data-color-border-outer="#ccc"
+        data-border-outer-width="1"
+        data-color-border-outer="rgba(51, 51, 51, 0.1)"
         data-color-border-outer-end="#ccc"
         data-color-needle-shadow-down="#222"
         data-border-shadow-width="0"
-        data-animation-duration="10"
+        data-animation-duration="1"
         data-width="150"
         data-height="150"
 
@@ -313,7 +313,8 @@
 
          gamepad.bind(Gamepad.Event.CONNECTED, function(device) {
            //if((device.id == 'Unknown Gamepad (STANDARD GAMEPAD Vendor: 054c Product: 05c4)') && (device_connected == false))
-           if((device.id.indexOf("Vendor: 054c Product: 05c4") >= 0) && (device_connected == false))
+          // if((device.id.indexOf("Vendor: 054c Product: 05c4") >= 0) && (device_connected == false))
+          if(device.id.indexOf("Vendor: 054c Product: 05c4") >= 0)
       			{
       			    device_index = device.index;
       			     device_connected = true;
@@ -436,13 +437,13 @@
           socket.on('video.segment', function(data){
             var data = new Uint8Array(data);
             vid.append(data);
-            console.log(data.length);
+            //console.log(data.length);
           });
 
           
         }
         
-        var lastData;
+        var avgCompassData = 0, n = 0;
         
         function motionLoad(){
           socket.emit('message', 'imu.on');
@@ -452,24 +453,28 @@
           socket.on('imu.data',function(rawData){
             //var compassGauge = document.getElementById('compass-gauge');
             var data = JSON.parse(rawData);
-            if (lastData != data) {
+            avgCompassData += parseFloat(data.clockwise);
+            if (n>5) {
+              avgCompassData = avgCompassData / 5.0;
                document.gauges.forEach(function(gauge) {
               // gauge.value = parseFloat( document.getElementById('compass-gauge').value);
               // console.log(gauge.value);
-              gauge.value = data.clockwise;
+              gauge.value = parseInt(avgCompassData);
+              console.log('compass:  ' + parseInt(avgCompassData));
+              avgCompassData = 0;
+              n = 0;
               });
-              //compassGauge.setAttribute('data-value', data.clockwise);
-              console.log(data.clockwise);
             }
-            lastData = data;
+            n++;
           });
           
           socket.on('environment.data', function(data){
-            console.log(data);
+            currentDataSeries.append(new Date().getTime(), data.amp);
             cpuDataSeries.append(new Date().getTime(), data.cpu);
             ramDataSeries.append(new Date().getTime(), data.ram);
             tempDataSeries.append(new Date().getTime(), data.temp);
             transmitDataSeries.append(new Date().getTime(), data.tx);
+            console.log(data);
           });
         }
     </script>
