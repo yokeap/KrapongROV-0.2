@@ -3,24 +3,29 @@
 var express = require('express')
   , path = require('path')
   , app = express()
+  , http = require('http').Server(app)
+  , io = require('socket.io')(http)
+  , exec = require('child_process').exec
   , spawn = require('child_process').spawn
   , imuSensor = require(__dirname + '/plugins/navigation-data')
-//  , events = require('events')
-  , dataBuffer  = null
+  , imuData = new imuSensor()
+  , si = require('systeminformation')
+  , SerialPort = require('serialport')
+  //, events = require('events')
+  , dataBuffer  = null  
   , initBuffer  = null
   , initFrame   = null 
   , ffmpeg_options  = '-threads 1 -f v4l2 -video_size 1920x1080 -i /dev/video1 \
-                      -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe -frag_duration 60000 \
+                      -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe -frag_duration 1000 \
                       -tune zerolatency -';
+  // , ffmpeg_options  = '-threads 1 -f v4l2 -video_size 1920x1080 -i /dev/video1 \
+  //                     -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe -moov_size 8192 \
+  //                     -tune zerolatency -';
+                      
+console.log(__dirname);
 
-
-const http = require('http').Server(app)
-    , io = require('socket.io')(http)
-    , exec = require('child_process').exec;
-    
-
-//ELP camera config initializaton
-var camera_settings = exec('H264_UVC_TestAP /dev/video1 --xuset-br 5000000 --xuset-qp 1', 
+//ELP camera custom driver initializaton config, bitrate:500kbps with QP 1
+var camera_settings = exec('H264_UVC_TestAP /dev/video1 --xuset-br 4000000 --xuset-qp 1', 
     (error, stdout, stderr) =>{
     console.log(`stdout: ${stdout}`);
     console.log(`stderr: ${stderr}`);
@@ -29,96 +34,43 @@ var camera_settings = exec('H264_UVC_TestAP /dev/video1 --xuset-br 5000000 --xus
     }
 });
 
+var DueSerialport = new SerialPort('/dev/ttyS1', {
+  autoOpen: false,
+  baudRate: 115200,
+  highWaterMark: 65535
+  //parser: SerialPort.parsers.readline('\n'),
+});
+
+var MicroSerialport = new SerialPort('/dev/ttyS2', {
+  autoOpen: false,
+  baudRate: 115200,
+  highWaterMark: 65535
+  //parser: SerialPort.parsers.readline('\n'),
+});
+
 http.listen(9010, () => {
     console.log('listening on localhost:9010');
 });
 
-console.log(__dirname);
-
-var imuData = new imuSensor();
-
-    //app.set('views', __dirname + '/views');
-    //app.set('view engine', 'ejs');
-    //app.use(express.favicon());
-    //app.use(express.logger('dev'));
-    //app.use(app.router);
-    app.use(express.static(path.join(__dirname, 'public')));
-    
-    app.use(express.static(path.join(__dirname, "./")));
-    app.use(express.static(path.join(__dirname, "./public/")));
-    app.use(express.static(path.join(__dirname, "./public/bower_components")));
-    app.use(express.static(path.join(__dirname, "./public/webcomponents")));
+//app.set('views', __dirname + '/views');
+//app.set('view engine', 'ejs');
+//app.use(express.favicon());
+//app.use(express.logger('dev'));
+//app.use(app.router);
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "./")));
+app.use(express.static(path.join(__dirname, "./public/")));
+app.use(express.static(path.join(__dirname, "./public/bower_components")));
+app.use(express.static(path.join(__dirname, "./public/webcomponents")));
 
                       
 app.get('/', (req, res) => {
     res.sendfile(__dirname + '/public/index.html');
 });
 
-/*********************************
-**ffmpeg mp4 fragmentation capturing stdout process.
-* 
-* *******************************/
-var child = spawn( 'ffmpeg', ffmpeg_options.match( /\S+/g ) );
-
-  child.stdout.on('data', function(data){
-    //init frame process, the init frame must be containing ftype(24bytes) on top of header stream.
-    if( initFrame === null ){
-      initBuffer = initBuffer == null ? data : Buffer.concat( [initBuffer,data] );
-      //checking fytp header
-      if( initBuffer.length < 25 ){
-        // return if that is fytp header (24bytes)
-        return;
-      }
-      initFrame = initBuffer;
-      return;                       //return the buffer concatenation of fytp+moov+moof+mdat(not sure)  
-    }
-    /*********************************************************************************
-     * 
-     * note: not sure what is section meaning, now this is not used.
-     *          assumming this involved the I-frame (GOP).
-     * *******************************************************************************/
-    if( data.length == 8192 ){
-      dataBuffer = dataBuffer == null ? data : Buffer.concat([dataBuffer,data]);;
-      return;
-      }
-      
-    //continues streaming  
-    dataBuffer = dataBuffer == null ? data : Buffer.concat([dataBuffer,data]);
-    child.emit('stream.start', dataBuffer);
-    dataBuffer = null;
-  });
   
-  child.stderr.on('data', function(error)
-  {
-  	  console.log("FFMPEG: " + error.toString());
-  	  //var timeStampInMs = window.performance && window.performance.now && window.performance.timing && window.performance.timing.navigationStart ? window.performance.now() + window.performance.timing.navigationStart : Date.now();
-     
-  });
-  
-  //imuData.registerEmitterHandlers(io);
-  
-//   var em = new events.EventEmitter();
-  
-//     em.on('imu.start', function(){
-//           imuData.registerEmitterHandlers(io);
-//     });
-
 io.on('connection', function(socket) {
     console.log('A user connected');
-    
-    
-    function start() {
-        if (initFrame) {
-            socket.emit('video.init.segment', initFrame);
-            //mp4segmenter.on('segment', emitSegment);
-        } else {
-            socket.emit('message', 'init segment not ready yet, reload page');
-        }
-    }
-    //Occured from child.on
-    function emitSegment(data) {
-        socket.emit('video.segment', data);
-    }
     
     socket.on('video.init.segment', function(data){
       if(data === 'completed'){
@@ -136,12 +88,30 @@ io.on('connection', function(socket) {
                 //em.emit('imu.start');
                 imuData.registerEmitterHandlers(io);
                 break;
+            case 'environment.data.on':
+              child.on('environment.data.stream', emitEnvironment);
+              MicroSerialport.open(function(err){
+                if(err){
+                  return console.log('Error opening port: ', err.message);
+                }
+                MicroSerialport.write('Beaglebone turn on');
+                console.log('Arduino micro has been connected');
+              });
+              break;
         }
     });
     
     socket.on('disconnect', () => {
         //stop();
         console.log('A user disconnected');
+        // child.removeListener('stream.start', function(data){
+        //   console.log('Streaming stop');
+        // });
+        child.removeListener('stream.start', emitSegment);
+        child.removeListener('environment.data.stream', emitEnvironment);
+        DueSerialport.removeListener('data', function (rawData){
+          
+        });
     });
     
     socket.on('thrust.data', function incoming(data) {
@@ -151,45 +121,53 @@ io.on('connection', function(socket) {
         writeAndDrain(str + '\n', null);
     });
     
-    //imuData.registerEmitterHandlers(io);
+    function start() {
+      if (initFrame) {
+          socket.emit('video.init.segment', initFrame);
+          //mp4segmenter.on('segment', emitSegment);
+      } else {
+          socket.emit('message', 'init segment not ready yet, reload page');
+      }
+    }
+    
+    //Occured from child.on
+    function emitSegment(data) {
+        //console.log(data.length);
+        socket.emit('video.segment', data);
+    }
+    
+    function emitEnvironment(data){
+        socket.emit('environment.data', data);
+    }
+    
 });
 
 
 function writeAndDrain (data, callback) {
   //console.log(data + ',' + mpu.getTemperatureCelsius());
   console.log(data);
-  port.write(data, function (error) {
+  DueSerialport.write(data, function (error) {
 		if(error){console.log(error);}
 	  else{
 	    //console.log('Write Completed/n');
 			// waits until all output data has been transmitted to the serial port.
-		  port.drain(callback);
+		  DueSerialport.drain(callback);
 		}
   });
 }
 
-var SerialPort = require('serialport');
-var Open = false;
-var port = new SerialPort('/dev/ttyS1', {
-  autoOpen: false,
-  baudRate: 115200,
-  highWaterMark: 65535
-  //parser: SerialPort.parsers.readline('\n'),
-});
 
-port.open(function (err) {
+DueSerialport.open(function (err) {
   if (err) {
     return console.log('Error opening port: ', err.message);
   }
 
   // Because there's no callback to write, write errors will be emitted on the port:
-  port.write('main screen turn on');
-  console.log("         Write Completed       ");
+  DueSerialport.write('main screen turn on');
+  console.log("Arduino Due has been connected");
 });
 
-
-port.on('open', function() {
-  Open = true;
+DueSerialport.on('open', function() {
   //writeAndDrain('main screen turn on\n', null);
   /*port.write('main screen turn on\n', function(err) {
     if (err) {
@@ -199,4 +177,90 @@ port.on('open', function() {
   });*/
 });
 
+// MicroSerialport.on('readable', function () {
+//   console.log('Data:', MicroSerialport.read());
+// });
+
+var env = {
+   amp: 0,
+   cpu: 0,
+   ram: 0,
+   temp: 0,
+   tx: 0
+  }
+
+
+var systemmonitor = setInterval(function(){
+  
+  MicroSerialport.on('data', function (rawData) {
+  //console.log('Data:', data.toString());
+    var data = JSON.parse(rawData);
+    env.amp = data.amp;
+    //console.log(data.amp);
+  });
+  
+  si.currentLoad(function(data){
+    env.cpu = Number(data.currentload).toFixed(2);
+    //console.log('CPU load : ' + env.cpu);
+    
+  });
+    
+  si.mem(function(data){
+    env.ram = Number(data.used / 1000000).toFixed(2);
+    //console.log('Memory (ram) : ' + Number(data.used / 1000000).toFixed(2) + '/' + Number(data.total / 1000000).toFixed(2));
+  });
+  
+  si.cpuTemperature(function(data){
+    env.temp = Number(imuData.getTemperature()).toFixed(2);
+    //console.log('Temperature : ' + env.temp);
+  });
+  
+  si.networkStats('eth0', function(data){
+    env.tx = Number((data.tx_sec * 8) / 1000000).toFixed(2);
+    //console.log('TX  : ' + Number((data.tx_sec * 8) / 1000000).toFixed(2));
+    //console.log('TX Total  : ' + Number(data.tx / 1000000).toFixed(2));
+  });
+  
+  child.emit('environment.data.stream', env);
+}, 1000);
+
+/*********************************
+**ffmpeg mp4 fragmentation capturing stdout process.
+* 
+* *******************************/
+var child = spawn( 'ffmpeg', ffmpeg_options.match( /\S+/g ) );
+child.stdout.on('data', function(data){
+  //init frame process, the init frame must be containing ftype(24bytes) on top of header stream.
+  if( initFrame === null ){
+    initBuffer = initBuffer == null ? data : Buffer.concat( [initBuffer,data] );
+    //checking fytp header
+    if( initBuffer.length < 25 ){
+      // return if that is fytp header (24bytes)
+      return;
+    }
+    initFrame = initBuffer;
+    return;                       //return the buffer concatenation of fytp+moov+moof+mdat(not sure)  
+  }
+  /*********************************************************************************
+   * 
+   * note: not sure what is section meaning, now this is not used.
+   *          assumming this involved the I-frame (GOP).
+   * *******************************************************************************/
+  if( data.length == 8192 ){
+    dataBuffer = dataBuffer == null ? data : Buffer.concat([dataBuffer,data]);
+    return;
+    }
+
+  //continues streaming  
+  dataBuffer = dataBuffer == null ? data : Buffer.concat([dataBuffer,data]);
+  child.emit('stream.start', dataBuffer);
+  dataBuffer = null;
+});
+child.stderr.on('data', function(error){
+	  console.log("FFMPEG: " + error.toString());
+	  //var timeStampInMs = window.performance && window.performance.now && window.performance.timing && window.performance.timing.navigationStart ? window.performance.now() + window.performance.timing.navigationStart : Date.now();
+   
+});
+
+process.setMaxListeners(0);
 
