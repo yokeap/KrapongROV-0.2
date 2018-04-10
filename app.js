@@ -15,12 +15,12 @@ var express = require('express')
   , dataBuffer  = null  
   , initBuffer  = null
   , initFrame   = null 
-  , ffmpeg_options  = '-threads 1 -f v4l2 -video_size 1920x1080 -i /dev/video1 \
-                      -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe -frag_duration 1000 \
-                      -tune zerolatency -';
   // , ffmpeg_options  = '-threads 1 -f v4l2 -video_size 1920x1080 -i /dev/video1 \
-  //                     -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe -moov_size 8192 \
+  //                     -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe -frag_duration 500 \
   //                     -tune zerolatency -';
+  , ffmpeg_options  = '-threads 0 -f v4l2 -video_size 1920x1080 -i /dev/video1 \
+                      -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe+faststart -frag_size 8192 \
+                      -tune zerolatency -';
                       
 console.log(__dirname);
 
@@ -90,13 +90,6 @@ io.on('connection', function(socket) {
                 break;
             case 'environment.data.on':
               child.on('environment.data.stream', emitEnvironment);
-              MicroSerialport.open(function(err){
-                if(err){
-                  return console.log('Error opening port: ', err.message);
-                }
-                MicroSerialport.write('Beaglebone turn on');
-                console.log('Arduino micro has been connected');
-              });
               break;
         }
     });
@@ -114,9 +107,16 @@ io.on('connection', function(socket) {
         });
     });
     
+    var light = 0;
+    
     socket.on('thrust.data', function incoming(data) {
+      
+                
+          if(light < 0) light = 0;
+          if(light > 95) light = 95;
+          if((light >= 0) && (light <= 95)) light = light + data.light;
         //var data = JSON.parse(message);
-        var str = String(data.thruster_1 + ',' + data.thruster_2 + ','  + data.thruster_3 + ',' + data.thruster_4 + ',' +data.thruster_5 + ',' + data.light + ',' + '0' + ',' + '0' + ',');
+        var str = String(data.thruster_1 + ',' + data.thruster_2 + ','  + data.thruster_3 + ',' + data.thruster_4 + ',' +data.thruster_5 + ',' + light + ',' + '0' + ',' + '0' + ',');
         //console.log(data);
         writeAndDrain(str + '\n', null);
     });
@@ -145,7 +145,7 @@ io.on('connection', function(socket) {
 
 function writeAndDrain (data, callback) {
   //console.log(data + ',' + mpu.getTemperatureCelsius());
-  console.log(data);
+  //console.log(data);
   DueSerialport.write(data, function (error) {
 		if(error){console.log(error);}
 	  else{
@@ -177,9 +177,13 @@ DueSerialport.on('open', function() {
   });*/
 });
 
-// MicroSerialport.on('readable', function () {
-//   console.log('Data:', MicroSerialport.read());
-// });
+MicroSerialport.open(function(err){
+  if(err){
+    return console.log('Error opening port: ', err.message);
+  }
+  MicroSerialport.write('Beaglebone turn on');
+  console.log('Arduino micro has been connected');
+});
 
 var env = {
    amp: 0,
@@ -262,5 +266,19 @@ child.stderr.on('data', function(error){
    
 });
 
-process.setMaxListeners(0);
 
+/*
+ * set cpu priority process for FFMPEG
+*/
+var proc= spawn("renice", [-20, child.pid]);
+  proc.on('exit', function (code) {
+      if (code !== 0){
+          console.log("Process "+ "cmd" +" exec failed with code - " +code);
+      }
+  });
+  proc.stdout.on('data', function(data){
+      console.log('stdout: ' + data);
+  });
+  proc.stderr.on('data', function(data){
+      console.log('stderr: '+ data);
+  });
