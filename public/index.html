@@ -5,17 +5,8 @@
     <style>
     
     body {
-    overflow:hidden;
-}
-
-       .smoothie-chart-wrap {
-         position: relative;
-         display: inline-block;
-         left: 0;
-         width: 150px;
-         height:70px;
-         top: 5px;
-      }
+      overflow:hidden;
+    }
 
       .sidebarInfo {
         background-image: -webkit-gradient(
@@ -64,6 +55,21 @@
         left: 0;
         width: 100px;
         height:100px;
+      }
+      
+      .baroGauge-canvas-warp{
+        position: absolute;
+        top: 20px; 
+        right: 10px;
+      }
+      
+      .smoothie-chart-wrap {
+         position: relative;
+         display: inline-block;
+         left: 0;
+         width: 150px;
+         height:70px;
+         top: 5px;
       }
 
       /* .canvasThrustGauge{
@@ -127,48 +133,49 @@
       <!--<packet video component declaration-->
       <packet-video id='camera' border='1' style='width: 80%; height:80%;'></packet-video>
 
-      <canvas data-type="radial-gauge"
-        data-min-value="0"
-        data-max-value="360"
-        data-major-ticks="N,NE,E,SE,S,SW,W,NW,N"
-        data-minor-ticks="5"
-        data-ticks-angle="360"
-        data-start-angle="180"
-        data-stroke-ticks="false"
-        data-highlights="false"
-        data-color-plate="rgba(51, 51, 51, 0.1)"
-        data-color-major-ticks="#f5f5f5"
-        data-color-minor-ticks="#ddd"
-        data-color-numbers="#ccc"
-        data-color-needle="rgba(240, 128, 128, 1)"
-        data-color-needle-end="rgba(255, 160, 122, .9)"
-        data-value-box="false"
-        data-value-text-shadow="false"
-        data-color-circle-inner="#fff"
-        data-color-needle-circle-outer="#ccc"
-        data-needle-circle-size="15"
-        data-needle-circle-outer="false"
-        data-animation-rule="linear"
-        data-needle-type="line"
-        data-needle-start="75"
-        data-needle-end="99"
-        data-needle-width="3"
-        data-borders="true"
-        data-border-inner-width="0"
-        data-border-middle-width="0"
-        data-border-outer-width="1"
-        data-color-border-outer="rgba(51, 51, 51, 0.1)"
-        data-color-border-outer-end="#ccc"
-        data-color-needle-shadow-down="#222"
-        data-border-shadow-width="0"
-        data-animation-duration="1"
-        data-width="150"
-        data-height="150"
-
-        style="position:absolute; top:20px; right:10px;"
-        
-        id="compass-gauge"
-      ></canvas>
+      <div class="baroGauge-canvas-warp" >
+        <canvas data-type="radial-gauge"
+            data-min-value="0"
+            data-max-value="360"
+            data-major-ticks="N,NE,E,SE,S,SW,W,NW,N"
+            data-minor-ticks="5"
+            data-ticks-angle="360"
+            data-start-angle="180"
+            data-stroke-ticks="false"
+            data-highlights="false"
+            data-color-plate="rgba(51, 51, 51, 0.1)"
+            data-color-major-ticks="#f5f5f5"
+            data-color-minor-ticks="#ddd"
+            data-color-numbers="#ccc"
+            data-color-needle="rgba(240, 128, 128, 1)"
+            data-color-needle-end="rgba(255, 160, 122, .9)"
+            data-value-box="false"
+            data-value-text-shadow="false"
+            data-color-circle-inner="#fff"
+            data-color-needle-circle-outer="#ccc"
+            data-needle-circle-size="1"
+            data-needle-circle-outer="false"
+            data-animation-rule="linear"
+            data-needle-type="line"
+            data-needle-start="75"
+            data-needle-end="99"
+            data-needle-width="3"
+            data-borders="true"
+            data-border-inner-width="0"
+            data-border-middle-width="0"
+            data-border-outer-width="1"
+            data-color-border-outer="rgba(51, 51, 51, 0.1)"
+            data-color-border-outer-end="#ccc"
+            data-color-needle-shadow-down="#222"
+            data-border-shadow-width="0"
+            data-animation-duration="1"
+            data-width="150"
+            data-height="150"
+            
+            id="compass-gauge"
+          ></canvas>
+          <div id="baroGaugeText"></div>
+      </div>
 
        <div class="thrustGaugePanel">
         <div class="canvas-wrap-gauge">
@@ -228,6 +235,8 @@
 
 
     <script>
+    
+    var light
 
     var opts = {
       angle: 0.18, // The span of the gauge arc
@@ -313,8 +322,9 @@
 
          gamepad.bind(Gamepad.Event.CONNECTED, function(device) {
            //if((device.id == 'Unknown Gamepad (STANDARD GAMEPAD Vendor: 054c Product: 05c4)') && (device_connected == false))
-          // if((device.id.indexOf("Vendor: 054c Product: 05c4") >= 0) && (device_connected == false))
-          if(device.id.indexOf("Vendor: 054c Product: 05c4") >= 0)
+           //if((device.id.indexOf("Vendor: 054c Product: 05c4") >= 0) && (device_connected == false))
+           if((device.id.indexOf("Xbox 360 Controller") >= 0) && (device_connected == false))
+          //if(device.id.indexOf("Vendor: 054c Product: 05c4") >= 0)
       			{
       			    device_index = device.index;
       			     device_connected = true;
@@ -364,7 +374,7 @@
         				gamepadJSON.sway = parseFloat(gamepad.axes[0]),
         				gamepadJSON.yaw = parseFloat(gamepad.buttons[6].value * -1) + parseFloat(gamepad.buttons[7].value),
         				gamepadJSON.heave = parseFloat(gamepad.axes[3]),
-        				gamepadJSON.light = parseInt(gamepad.buttons[12].value) + parseInt(gamepad.buttons[13].value * -1),
+        				gamepadJSON.light = parseInt(gamepad.buttons[12].value * 10) + parseInt(gamepad.buttons[13].value * -20),
         				gamepadJSON.boost = parseFloat(gamepad.buttons[5].value)
         				thrustAlloc(gamepadJSON);
            }tick++;
@@ -375,6 +385,7 @@
         var data = dirThrust;
         if(data){
           //console.log(data);
+          //var x = math.matrix([[data.surge], [data.sway], [data.yaw / 2], [data.heave]]);
           var x = math.matrix([[data.surge], [data.sway], [data.yaw / 2], [data.heave]]);
 
           var f = math.multiply(math.matrix([[-0.3535533906,  0.3535533906,  0.8928571429, 0],
@@ -386,17 +397,21 @@
           // Planar motion thust adjustmentation
           for (var i = 0 ; i < 4; i++) {
                   // Thruster boost with R1
-                  if(data.boost) f._data[i] = Math.round(f._data[i] * 130)
+                  if(data.boost) {
+                    if(i != 2) f._data[i] = Math.round(f._data[i] * 70);
+                    if(i == 2) f._data[2] = Math.round(f._data[2] * 65);
+                  }
                   else {
-                    f._data[i] = Math.round(f._data[i] * 80);
+                    if(i != 2) f._data[i] = Math.round(f._data[i] * 50);
+                    if(i == 2) f._data[2] = Math.round(f._data[2] * 45);
                   }
                   if(f._data[i] < 5) f._data[i] = 0;
           }
 
           // Vertical motion thrust adjustmentation
-          if(data.boost) f._data[4] = math.round(f._data[4] * 100);
+          if(data.boost) f._data[4] = math.round(f._data[4] * 60);
           else{
-            f._data[4] = Math.round(f._data[4] * 50);
+            f._data[4] = Math.round(f._data[4] * 30);
           }
 
           thrusterGauge[0].set(f._data[0]); // set actual value
@@ -408,11 +423,17 @@
 
 
           var thrustJSON = {
-            thruster_1 : f._data[0],
-            thruster_2 : f._data[1],
-            thruster_3 : f._data[2],
-            thruster_4 : f._data[3],
-            thruster_5 : f._data[4],
+            thruster_1 : f._data[0] * -1,
+            thruster_3 : f._data[1],
+            thruster_4 : f._data[2],
+            thruster_2 : f._data[3],
+            thruster_5 : f._data[4] * -1,
+            
+            // thruster_1 : f._data[0] * -1,
+            // thruster_2 : f._data[2],
+            // thruster_3 : f._data[3],
+            // thruster_4 : f._data[1],
+            // thruster_5 : f._data[4],
             light: data.light,
             servo: 0,
             test: 0
@@ -454,13 +475,18 @@
             //var compassGauge = document.getElementById('compass-gauge');
             var data = JSON.parse(rawData);
             avgCompassData += parseFloat(data.clockwise);
-            if (n>5) {
-              avgCompassData = avgCompassData / 5.0;
-               document.gauges.forEach(function(gauge) {
+            // document.gauges.forEach(function(gauge) {
+            //   gauge.value = parseFloat( document.getElementById('compass-gauge').value);
+            //   gauge.value = parseInt(data.clockwise);
+            // });
+            if (n>3) {
+              avgCompassData = parseFloat(avgCompassData) / parseFloat(n + 1);
+              document.gauges.forEach(function(gauge) {
               // gauge.value = parseFloat( document.getElementById('compass-gauge').value);
               // console.log(gauge.value);
-              gauge.value = parseInt(avgCompassData);
-              console.log('compass:  ' + parseInt(avgCompassData));
+              gauge.value = Math.round(data.clockwise);
+              //gauge.value = Math.round(avgCompassData);
+              console.log('compass:  ' + parseInt(data.clockwise));
               avgCompassData = 0;
               n = 0;
               });
