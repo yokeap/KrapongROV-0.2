@@ -186,6 +186,19 @@ var AK8975 = {
 	}
 };
 
+var MAG_CALIBRATION = {
+  min:
+   { x: -116.39999999999999,
+     y: -71.39999999999999,
+     z: 163.79999999999998 },
+  max: { x: -29.099999999999998, y: 12, z: 238.5 },
+  offset: { x: -72.75, y: -29.699999999999996, z: 201.14999999999998 },
+  scale:
+   { x: 1.4054982817869417,
+     y: 1.4712230215827342,
+     z: 1.6425702811244973 } 
+};
+
 ////////////////////////////////////////////////////////////////////////////////////
 // /** ---------------------------------------------------------------------- **/ //
 //  *		 						MPU Configuration						   *  //
@@ -338,7 +351,8 @@ mpu9150.prototype.getTemperatureCelsius = function() {
 mpu9150.prototype.getTemperatureCelsiusDigital = function() {
     var TEMP_OUT = this.getTemperature();
 	if (TEMP_OUT) {
-		return (TEMP_OUT / 340. + 36.53);
+		// return (TEMP_OUT / 340. + 36.53);
+		return (TEMP_OUT / 333.87 + 21.0);
 	}
 	return 0;
 };
@@ -390,12 +404,30 @@ mpu9150.prototype.getMotion9 = function() {
 	if (this.i2c) {
 		var mpudata = this.getMotion6();
         var magdata = this.getMagAttitude();
+        //var magdata = [0.0, 0.0, 0.0];
+        // for(var i=0; i<10; i++){
+        // 	//var MagData = this.getMagAttitude();
+        // 	for(var k = 0; k < 3; k++){
+        // 		// magdata[0] = magdata[0] + this.getMagAttitude()[0];
+        // 		// magdata[1] = magdata[1] + this.getMagAttitude()[1];
+        // 		// magdata[2] = magdata[2] + this.getMagAttitude()[2];
+        		
+        // 		magdata[0] += parseFloat(this.getMagAttitude()[0]);
+        // 		magdata[1] += parseFloat(this.getMagAttitude()[1]);
+        // 		magdata[2] += parseFloat(this.getMagAttitude()[2]);
+        // 	}
+        // }
+        // magdata[0] = magdata[0] / 10.0;
+        // magdata[1] = magdata[1] / 10.0;
+        // magdata[2] = magdata[2] / 10.0;
+        //magdata = magdata / 10;
         //var magdata = [0, 0, 0];
 	/*	if (this.ak8975) {
 		//	magdata = this.ak8975.getMagAttitude();
 		} else {
 			magdata = [0, 0, 0];
 		}*/
+		//console.log(magdata);
 		return mpudata.concat(magdata);
 	}
 	return false;
@@ -465,9 +497,13 @@ mpu9150.prototype.getMagAttitude = function() {
 		//((buffer.readInt16LE(2) * this.asay) - cal.offset.y) * cal.scale.y,
 		//((buffer.readInt16LE(4) * this.asaz) - cal.offset.z) * cal.scale.z
 		
-		buffer.readInt16LE(0),
-		buffer.readInt16LE(2),
-		buffer.readInt16LE(4)
+		(((buffer.readInt16LE(0) * 0.3) - MAG_CALIBRATION.offset.x) * MAG_CALIBRATION.scale.x).toFixed(3),		//0.3uT/LSB and 55.3 is offset
+		(((buffer.readInt16LE(2) * 0.3) - MAG_CALIBRATION.offset.y) * MAG_CALIBRATION.scale.y).toFixed(3),
+		(((buffer.readInt16LE(4) * 0.3) - MAG_CALIBRATION.offset.z) * MAG_CALIBRATION.scale.z).toFixed(3)
+		
+		// buffer.readInt16LE(0) * 0.3,		//0.3uT/LSB and 55.3 is offset
+		// buffer.readInt16LE(2) * 0.3,
+		// buffer.readInt16LE(4) * 0.3
 	];
 };
 
@@ -588,7 +624,8 @@ mpu9150.prototype.getRoll = function(value) {
 };
 
 mpu9150.prototype.getYaw = function(value) {
-	 var heading = Math.atan2(value[8] * -1, value[7] * -1) * 180 / Math.PI;
+	 //var heading = Math.atan2(value[8], value[7] * -1) * 180 / Math.PI;
+	 var heading = Math.atan2(value[8], value[7] * -1) * 180 / Math.PI;
 	 return heading;
 };
 
