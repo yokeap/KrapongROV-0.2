@@ -33,7 +33,7 @@ KrapongROV version 0.2, Remotely Operated Vehicle, KU IMS
   Standard Protocol   : HomePlug AV, IEEE802.3, IEEE802.3u \
   Interface           : 1*10/100Mbps Ethernet Port \
   Maximum range       : 300m
-  ##### This power line is can be used with DC > 48V (tested)
+  /*This power line is can be used with DC > 48V (tested)*/
   
  ### Software description:
  ------------
