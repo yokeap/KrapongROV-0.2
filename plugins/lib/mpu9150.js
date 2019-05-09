@@ -614,13 +614,14 @@ mpu9150.prototype.getI2CMasterMode = function() {
 };
 
 mpu9150.prototype.getPitch = function(value) {
-	//return ((Math.atan2(value[0], value[2]) + Math.PI) * (180 / Math.PI)) - 180;
-	return ((Math.atan2(value[1], value[2]) + Math.PI) * (180 / Math.PI)) - 180;
+	return ((Math.atan2(value[0] * -1, value[1] * -1)) * (180 / Math.PI));
+	//return ((Math.atan2(value[1] * -1, Math.sqrt( (value[0] * value[0]) + (value[2] * value[2]) )) * (180 / Math.PI)));
 };
 
 mpu9150.prototype.getRoll = function(value) {
 	//return ((Math.atan2(value[1], value[2]) + Math.PI) * (180 / Math.PI)) - 180;
-	return ((Math.atan2(value[1], value[0]) + Math.PI) * (180 / Math.PI)) - 180;
+	return ((Math.atan2(value[1] * -1, value[2] *-1)) * (180 / Math.PI));
+	//return ((Math.atan2(value[1], Math.sqrt( (value[0] *-1) * (value[0] *-1) * (value[2] * value[2]) )) * (180 / Math.PI)));
 };
 
 mpu9150.prototype.getYaw = function(value) {
