@@ -31,6 +31,7 @@ var mpu = new mpu9150({
 
 var kalmanX = new mpu.Kalman_filter();
 var kalmanY = new mpu.Kalman_filter();
+var kalmanZ = new mpu.Kalman_filter();
 var lowpassYaw = 0;
 var initialize = false;
 
@@ -50,11 +51,13 @@ var imuSensor = function(){
       , yaw = 0
       , kalAngleX = 0
       , kalAngleY = 0
+      , kalAngleZ = 0
       , gyroXangle = 0
       ,	gyroYangle = 0
       ,	gyroZangle = 0
       , compAngleX = 0
-      , compAngleY = 0;
+      , compAngleY = 0
+      , compAngleZ = 0;
       
 imuSensor.prototype.getTemperature = function(){
   return mpu.getTemperatureCelsiusDigital();
@@ -70,27 +73,23 @@ imuSensor.prototype.registerEmitterHandlers = function(emitter){
         
         var m9 = mpu.getMotion9();
         
-        //var dt = (micros() - timer) / 1000000;
-        var dt = (micros() - timer) / 500000;
+        var dt = (micros() - timer) / 1000000;
+        //var dt = (micros() - timer) / 500000;
         timer = micros();
         
-        pitch = mpu.getPitch(m9) + 90;
-        roll = (mpu.getRoll(m9) + 91) * -1;
+        pitch = (mpu.getPitch(m9));
+        roll = (mpu.getRoll(m9) - 89);
+        console.log("pitch: " + pitch + ",       " + "roll: " + roll);
         //yaw = (Math.round(mpu.getYaw(m9)) + 85.0);
-        yaw = mpu.getYaw(m9).toFixed(3) - 90.0;
+        //yaw = mpu.getYaw(m9).toFixed(3) - 90.0;
+        yaw = mpu.getYaw(m9) - 90.0;
         if(yaw >= 0.0 && yaw <= 180.0){
           yaw = yaw;
         }
         else{
           yaw = 180.0 + (180.0 + parseFloat(yaw));
-        }
-        // if(yaw > -180.0){
-        //   yaw = yaw - 360.0;
-        //   //console.log(yaw)
-        // }
-        // else if (yaw < 180){
-        //   yaw = yaw + 360;
-        // }
+        } 
+
         var gyroXrate = m9[3] / 131.0;
         var gyroYrate = m9[4] / 131.0;
         var gyroZrate = m9[5] / 131.0;
@@ -109,10 +108,14 @@ imuSensor.prototype.registerEmitterHandlers = function(emitter){
         }
         kalAngleY = kalmanY.getAngle(pitch, gyroYrate, dt);
         
+        kalAngleZ = kalmanZ.getAngle(yaw, gyroZrate, dt);
+        
         gyroXangle += gyroXrate * dt;
         gyroYangle += gyroYrate * dt;
+        gyroZangle += gyroZrate * dt;
         compAngleX = 0.93 * (compAngleX + gyroXrate * dt) + 0.07 * roll;
         compAngleY = 0.93 * (compAngleY + gyroYrate * dt) + 0.07 * pitch;
+        compAngleZ = 0.93 * (compAngleZ + gyroZrate * dt) + 0.2 * yaw;
         
         if (gyroXangle < -180 || gyroXangle > 180) gyroXangle = kalAngleX;
         if (gyroYangle < -180 || gyroYangle > 180) gyroYangle = kalAngleY;
@@ -122,7 +125,7 @@ imuSensor.prototype.registerEmitterHandlers = function(emitter){
         	roll: compAngleX,
         	clockwise: yaw
         };
-        //console.log(imuData.clockwise);
+        //console.log(imuData.pitch);
         emitter.emit('imu.data', JSON.stringify(imuData));
     }, 50);
 };
