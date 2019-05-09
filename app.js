@@ -1,6 +1,7 @@
 'use strict';
 
 var express = require('express')
+  , process = require('process')
   , path = require('path')
   , app = express()
   , http = require('http').Server(app)
@@ -15,12 +16,12 @@ var express = require('express')
   , dataBuffer  = null  
   , initBuffer  = null
   , initFrame   = null 
-  // , ffmpeg_options  = '-threads 1 -f v4l2 -video_size 1920x1080 -i /dev/video1 \
-  //                     -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe -frag_duration 500 \
-  //                     -tune zerolatency -';
-  , ffmpeg_options  = '-threads 0 -f v4l2 -video_size 1920x1080 -i /dev/video1 \
-                      -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe+faststart -frag_size 8192 \
+  , ffmpeg_options  = '-threads 1 -f v4l2 -video_size 1920x1080 -i /dev/video1 \
+                      -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe+faststart -frag_duration 500 \
                       -tune zerolatency -';
+  // , ffmpeg_options  = '-threads 0 -f v4l2 -video_size 1920x1080 -i /dev/video1 \
+  //                     -c:v copy -f mp4 -g 1 -movflags empty_moov+default_base_moof+frag_keyframe+faststart -frag_size 8192 \
+  //                     -tune zerolatency -';
                       
 console.log(__dirname);
 
@@ -37,15 +38,15 @@ var camera_settings = exec('H264_UVC_TestAP /dev/video1 --xuset-br 4000000 --xus
 var DueSerialport = new SerialPort('/dev/ttyS1', {
   autoOpen: false,
   baudRate: 115200,
-  highWaterMark: 65535
-  //parser: SerialPort.parsers.readline('\n'),
+  highWaterMark: 65535,
+  parser: new SerialPort.parsers.Readline('\n')
 });
 
 var MicroSerialport = new SerialPort('/dev/ttyS2', {
   autoOpen: false,
   baudRate: 115200,
-  highWaterMark: 65535
-  //parser: SerialPort.parsers.readline('\n'),
+  highWaterMark: 65535,
+  parser: new SerialPort.parsers.Readline('\n')
 });
 
 http.listen(9010, () => {
@@ -90,6 +91,7 @@ io.on('connection', function(socket) {
                 break;
             case 'environment.data.on':
               child.on('environment.data.stream', emitEnvironment);
+              child.on('pressure.data.stream', emitPressure);
               break;
         }
     });
@@ -102,9 +104,9 @@ io.on('connection', function(socket) {
         // });
         child.removeListener('stream.start', emitSegment);
         child.removeListener('environment.data.stream', emitEnvironment);
-        DueSerialport.removeListener('data', function (rawData){
-          
-        });
+        child.removeListener('pressure.data', emitPressure);
+        DueSerialport.removeListener('data', function (rawData){});
+        MicroSerialport.removeListener('data', function(rawData){});
     });
     
     var light = 0;
@@ -115,9 +117,9 @@ io.on('connection', function(socket) {
           if(light < 0) light = 0;
           if(light > 95) light = 95;
           if((light >= 0) && (light <= 95)) light = light + data.light;
-        //var data = JSON.parse(message);
-        var str = String(data.thruster_1 + ',' + data.thruster_2 + ','  + data.thruster_3 + ',' + data.thruster_4 + ',' +data.thruster_5 + ',' + light + ',' + '0' + ',' + '0' + ',');
-        //console.log(data);
+        //var data = JSON.parse(data.thr);
+        var str = String(data.thruster_1 + ',' + data.thruster_2 + ','  + data.thruster_3 + ',' + data.thruster_4 + ',' + data.thruster_5 + ',' + light + ',' + '0' + ',' + '0' + ',');
+        console.log(data);
         writeAndDrain(str + '\n', null);
     });
     
@@ -138,6 +140,10 @@ io.on('connection', function(socket) {
     
     function emitEnvironment(data){
         socket.emit('environment.data', data);
+    }
+    
+    function emitPressure(data){
+      socket.emit('pressure.data', data);
     }
     
 });
@@ -167,15 +173,30 @@ DueSerialport.open(function (err) {
   console.log("Arduino Due has been connected");
 });
 
-DueSerialport.on('open', function() {
-  //writeAndDrain('main screen turn on\n', null);
-  /*port.write('main screen turn on\n', function(err) {
-    if (err) {
-      return console.log('Error on write: ', err.message);
-    }
-    console.log('message written');
-  });*/
-});
+// DueSerialport.on('open', function() {
+//   //writeAndDrain('main screen turn on\n', null);
+//   /*port.write('main screen turn on\n', function(err) {
+//     if (err) {
+//       return console.log('Error on write: ', err.message);
+//     }
+//     console.log('message written');
+//   });*/
+  
+// });
+
+
+DueSerialport.on('data', function (rawData) {
+  var tempString = rawData.toString();
+   child.emit(tempString);
+  // if(tempString.charAt(0) == 'f'){
+  //   console.log(tempString.substr(2));
+  //   child.emit('environment.data.stream', tempString.substr(2));
+  // }
+  // if(tempString.charAt(0) == 'd'){
+  //   console.log(tempString.substr(2));
+  //   child.emit('environment.data.stream', tempString.substr(2));
+  // }
+  });
 
 MicroSerialport.open(function(err){
   if(err){
@@ -197,7 +218,7 @@ var env = {
 var systemmonitor = setInterval(function(){
   
   MicroSerialport.on('data', function (rawData) {
-  //console.log('Data:', data.toString());
+  console.log('Micro_Data:' + data.toString());
     var data = JSON.parse(rawData);
     env.amp = data.amp;
     //console.log(data.amp);
@@ -270,7 +291,7 @@ child.stderr.on('data', function(error){
 /*
  * set cpu priority process for FFMPEG
 */
-var proc= spawn("renice", [-20, child.pid]);
+var proc= spawn("renice", [-20, process.pid]);
   proc.on('exit', function (code) {
       if (code !== 0){
           console.log("Process "+ "cmd" +" exec failed with code - " +code);
